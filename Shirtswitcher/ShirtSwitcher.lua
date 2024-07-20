@@ -8,8 +8,8 @@ frame:RegisterEvent("SPELLCAST_START")
 frame:RegisterEvent("PLAYER_TARGET_CHANGED")
 
 -- Configuration
-local QUEST_SHIRT_ID = 26003 -- Replace with the itemID of the shirt for quests
-local PROFESSION_SHIRT_ID = 26013  -- Replace with the itemID of the shirt for professions
+local QUEST_SHIRT_ID = 26003 -- New Beginnings
+local PROFESSION_SHIRT_ID = 26013  -- Savant
 
 local gatheringSkills = {
     ["Skinning"] = true,
