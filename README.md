@@ -16,6 +16,6 @@ You automatically switch to the "Savant" (which gives 5 skillups for professions
 
 --7/20/2024
 
-added support for silvertongue shirt
-added minimap button to swtich between silvertongue and new beginnings shirt
-added scanning to look for shirt and give error messages if not found
+--added support for silvertongue shirt
+--added minimap button to swtich between silvertongue and new beginnings shirt
+--added scanning to look for shirt and give error messages if not found
