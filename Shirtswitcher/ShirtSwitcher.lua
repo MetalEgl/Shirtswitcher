@@ -14,7 +14,7 @@ local PROFESSION_SHIRT_ID = 26013  -- Replace with the itemID of the shirt for p
 local gatheringSkills = {
     ["Skinning"] = true,
     ["Mining"] = true,
-    ["Find Herbs"] = true
+    ["Herb Gathering"] = true  
 }
 
 -- Function to equip a shirt
