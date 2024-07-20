@@ -2,19 +2,20 @@
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("QUEST_DETAIL")
+frame:RegisterEvent("GOSSIP_SHOW")
 frame:RegisterEvent("CRAFT_SHOW")
 frame:RegisterEvent("TRADE_SKILL_SHOW")
 frame:RegisterEvent("SPELLCAST_START")
 frame:RegisterEvent("PLAYER_TARGET_CHANGED")
 
 -- Configuration
-local QUEST_SHIRT_ID = 26003 -- New Beginnings
-local PROFESSION_SHIRT_ID = 26013  -- Savant
+local QUEST_SHIRT_ID = 26003 
+local PROFESSION_SHIRT_ID = 26013  
 
 local gatheringSkills = {
     ["Skinning"] = true,
     ["Mining"] = true,
-    ["Herb Gathering"] = true  
+    ["Herb Gathering"] = true
 }
 
 -- Function to equip a shirt
@@ -34,7 +35,7 @@ end
 
 -- Event handler
 frame:SetScript("OnEvent", function()
-    if event == "QUEST_DETAIL" then
+    if event == "QUEST_DETAIL" or event == "GOSSIP_SHOW" then
         EquipShirt(QUEST_SHIRT_ID)
     elseif event == "CRAFT_SHOW" or event == "TRADE_SKILL_SHOW" then
         EquipShirt(PROFESSION_SHIRT_ID)
@@ -44,8 +45,12 @@ frame:SetScript("OnEvent", function()
             EquipShirt(PROFESSION_SHIRT_ID)
         end
     elseif event == "PLAYER_TARGET_CHANGED" then
-        if UnitExists("target") and UnitCanAttack("player", "target") then
-            EquipShirt(QUEST_SHIRT_ID)
+        if UnitExists("target") then
+            if UnitCanAttack("player", "target") then
+                EquipShirt(QUEST_SHIRT_ID)
+            elseif UnitIsPlayer("target") == nil then  -- Check if target is an NPC
+                EquipShirt(QUEST_SHIRT_ID)
+            end
         end
     end
 end)
