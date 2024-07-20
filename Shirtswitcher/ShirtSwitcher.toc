@@ -1,0 +1,6 @@
+## Interface: 11200
+## Title: ShirtSwitcher
+## Notes: Automatically switches shirts for quests and professions
+## Author: Dark-Nyctermoon
+## Version: 1.0
+ShirtSwitcher.lua
