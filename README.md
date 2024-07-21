@@ -12,7 +12,7 @@ This mod is created to facilitate the automatic switching of shirts in Nyctermoo
 
 You automatically switch to the "New Beginnings" (which adds 100% xp)  shirt when you target an enemy, or open a quest turn in window.  You can click the minimap button to turn this into Reputation mode which instead keeps the "Silvertongue" shirt equipped in those situations.
 
-You automatically switch to the "Savant" (which gives 5 skillups for professions) shirt when mining, skinning, or performing herbalism.  Also you switch when you open a profession window.
+You automatically switch to the "Savant" (which gives +4 skillups for professions) shirt when mining, skinning, or performing herbalism.  Also you switch when you open a profession window.
 
 --7/20/2024
 
