@@ -1,6 +1,5 @@
 # Shirtswitcher
-![_057366a2-ca1a-45b0-81bd-51988f76a4da](https://github.com/user-attachments/assets/56a92cbd-be28-49ae-b8e7-766c7f5a6f94)
-
+![_22d576c7-c8e9-493b-9d21-80b4622a951f](https://github.com/user-attachments/assets/99e98084-e915-4509-b37a-81fc6ab94864)
 
 Addon created specfifically for the WoW Server Nyctermoon    https://nyctermoonwow.net/
 
