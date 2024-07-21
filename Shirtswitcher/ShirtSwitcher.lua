@@ -1,8 +1,67 @@
+-- Addon initialization
+Shirtswitcher = {}
+local frame = CreateFrame("Frame")
+frame:RegisterEvent("VARIABLES_LOADED")
+frame:RegisterEvent("QUEST_DETAIL")
+frame:RegisterEvent("GOSSIP_SHOW")
+frame:RegisterEvent("CRAFT_SHOW")
+frame:RegisterEvent("TRADE_SKILL_SHOW")
+frame:RegisterEvent("SPELLCAST_START")
+frame:RegisterEvent("PLAYER_TARGET_CHANGED")
+frame:RegisterEvent("PLAYER_LOGOUT")
+
+-- Configuration
+local NEW_BEGINNINGS_ID = 26003  -- XP shirt
+local SAVANT_ID = 26013          -- Profession shirt
+local SILVERTONGUE_ID = 26011    -- Reputation shirt
+Shirtswitcher.currentMode = "xp"  -- Default mode (XP mode uses New Beginnings shirt)
+Shirtswitcher.hasNewBeginnings = false
+Shirtswitcher.hasSilvertongue = false
+Shirtswitcher.hasSavant = false
+local gatheringSkills = {
+    ["Skinning"] = true,
+    ["Mining"] = true,
+    ["Herb Gathering"] = true
+}
+
+-- Function to check if player has a specific shirt (in bags or equipped)
+local function HasShirt(itemID)
+    -- Check equipped shirt
+    local equippedLink = GetInventoryItemLink("player", 4) -- 4 is the slot ID for shirts
+    if equippedLink and string.find(equippedLink, "item:"..itemID) then
+        return true
+    end
+    
+    -- Check bags
+    for bag = 0, 4 do
+        for slot = 1, GetContainerNumSlots(bag) do
+            local link = GetContainerItemLink(bag, slot)
+            if link and string.find(link, "item:"..itemID) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 -- Function to rescan for all shirts
 local function RescanShirts()
     Shirtswitcher.hasNewBeginnings = HasShirt(NEW_BEGINNINGS_ID)
     Shirtswitcher.hasSilvertongue = HasShirt(SILVERTONGUE_ID)
     Shirtswitcher.hasSavant = HasShirt(SAVANT_ID)
+end
+
+-- Function to scan only for Savant shirt
+local function ScanSavantShirt()
+    local previousState = Shirtswitcher.hasSavant
+    Shirtswitcher.hasSavant = HasShirt(SAVANT_ID)
+    if Shirtswitcher.hasSavant ~= previousState then
+        if Shirtswitcher.hasSavant then
+            DEFAULT_CHAT_FRAME:AddMessage("Shirtswitcher: 'Savant' shirt found!", 0, 1, 0)
+        else
+            DEFAULT_CHAT_FRAME:AddMessage("Shirtswitcher: 'Savant' shirt not found!", 1, 0, 0)
+        end
+    end
 end
 
 -- Function to equip a shirt
@@ -70,6 +129,7 @@ frame:SetScript("OnEvent", function()
             EquipShirt(SILVERTONGUE_ID)
         end
     elseif event == "CRAFT_SHOW" or event == "TRADE_SKILL_SHOW" then
+        ScanSavantShirt()  -- Scan for Savant shirt when opening profession window
         if Shirtswitcher.hasSavant then
             EquipShirt(SAVANT_ID)
         else
@@ -77,6 +137,7 @@ frame:SetScript("OnEvent", function()
         end
     elseif event == "SPELLCAST_START" then
         if gatheringSkills[arg1] then
+            ScanSavantShirt()  -- Scan for Savant shirt when starting a gathering skill
             if Shirtswitcher.hasSavant then
                 EquipShirt(SAVANT_ID)
             else
@@ -205,4 +266,4 @@ SLASH_SWITCHSHIRT1 = "/switchshirt"
 SLASH_SWITCHSHIRT2 = "/ss"
 SlashCmdList["SWITCHSHIRT"] = ToggleShirt
 
-DEFAULT_CHAT_FRAME:AddMessage("Shirtswitcher addon loaded. Use /switchshirt, /ss, or click the minimap icon to toggle between XP and Reputation modes.")
+DEFAULT_CHAT_FRAME:AddMessage("Shirtswitcher addon loaded. Use /switchshirt, /ss, or click the minimap icon to toggle between XP (New Beginnings) and Reputation (Silvertongue) modes.")
