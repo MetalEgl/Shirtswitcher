@@ -18,6 +18,7 @@ Shirtswitcher.currentMode = "xp"  -- Default mode (XP mode uses New Beginnings s
 Shirtswitcher.hasNewBeginnings = false
 Shirtswitcher.hasSilvertongue = false
 Shirtswitcher.hasSavant = false
+Shirtswitcher.chatMessagesEnabled = true  -- Default to showing chat messages
 local gatheringSkills = {
     ["Skinning"] = true,
     ["Mining"] = true,
@@ -55,7 +56,7 @@ end
 local function ScanSavantShirt()
     local previousState = Shirtswitcher.hasSavant
     Shirtswitcher.hasSavant = HasShirt(SAVANT_ID)
-    if Shirtswitcher.hasSavant ~= previousState then
+    if Shirtswitcher.hasSavant ~= previousState and Shirtswitcher.chatMessagesEnabled then
         if Shirtswitcher.hasSavant then
             DEFAULT_CHAT_FRAME:AddMessage("Shirtswitcher: 'Savant' shirt found!", 0, 1, 0)
         else
@@ -90,34 +91,54 @@ end
 local function ToggleShirt()
     RescanShirts()  -- Rescan before toggling
     if not Shirtswitcher.hasNewBeginnings or not Shirtswitcher.hasSilvertongue then
-        DEFAULT_CHAT_FRAME:AddMessage("Shirtswitcher: You need both 'New Beginnings' and 'Silvertongue' shirts to toggle.")
+        if Shirtswitcher.chatMessagesEnabled then
+            DEFAULT_CHAT_FRAME:AddMessage("Shirtswitcher: You need both 'New Beginnings' and 'Silvertongue' shirts to toggle.")
+        end
         return
     end
     
     if Shirtswitcher.currentMode == "xp" then
         Shirtswitcher.currentMode = "reputation"
         EquipShirt(SILVERTONGUE_ID)
-        DEFAULT_CHAT_FRAME:AddMessage("Switched to Silvertongue (Reputation Mode)")
+        if Shirtswitcher.chatMessagesEnabled then
+            DEFAULT_CHAT_FRAME:AddMessage("Switched to Silvertongue (Reputation Mode)")
+        end
     else
         Shirtswitcher.currentMode = "xp"
         EquipShirt(NEW_BEGINNINGS_ID)
-        DEFAULT_CHAT_FRAME:AddMessage("Switched to New Beginnings (XP Mode)")
+        if Shirtswitcher.chatMessagesEnabled then
+            DEFAULT_CHAT_FRAME:AddMessage("Switched to New Beginnings (XP Mode)")
+        end
     end
     Shirtswitcher:UpdateMinimapButton()
+end
+
+-- Function to toggle chat messages
+local function ToggleChatMessages()
+    Shirtswitcher.chatMessagesEnabled = not Shirtswitcher.chatMessagesEnabled
+    if Shirtswitcher.chatMessagesEnabled then
+        DEFAULT_CHAT_FRAME:AddMessage("Shirtswitcher: Chat messages enabled")
+    else
+        DEFAULT_CHAT_FRAME:AddMessage("Shirtswitcher: Chat messages disabled")
+    end
 end
 
 -- Event handler
 frame:SetScript("OnEvent", function()
     if event == "VARIABLES_LOADED" then
-        -- Load saved mode
-        if ShirtswitcherDB and ShirtswitcherDB.currentMode then
-            Shirtswitcher.currentMode = ShirtswitcherDB.currentMode
-            DEFAULT_CHAT_FRAME:AddMessage("Shirtswitcher: Loaded last used mode - " .. 
-                (Shirtswitcher.currentMode == "xp" and "XP (New Beginnings)" or "Reputation (Silvertongue)"))
+        -- Load saved mode and preferences
+        if ShirtswitcherDB then
+            Shirtswitcher.currentMode = ShirtswitcherDB.currentMode or Shirtswitcher.currentMode
+            Shirtswitcher.chatMessagesEnabled = ShirtswitcherDB.chatMessagesEnabled
+            if Shirtswitcher.chatMessagesEnabled == nil then Shirtswitcher.chatMessagesEnabled = true end
+            if Shirtswitcher.chatMessagesEnabled then
+                DEFAULT_CHAT_FRAME:AddMessage("Shirtswitcher: Loaded last used mode - " .. 
+                    (Shirtswitcher.currentMode == "xp" and "XP (New Beginnings)" or "Reputation (Silvertongue)"))
+            end
         end
         -- Initial scan for shirts
         RescanShirts()
-        if not Shirtswitcher.hasSavant then
+        if not Shirtswitcher.hasSavant and Shirtswitcher.chatMessagesEnabled then
             DEFAULT_CHAT_FRAME:AddMessage("Shirtswitcher: Warning - 'Savant' shirt not found in bags or equipped!", 1, 0, 0)
         end
         -- Initialize minimap button after variables are loaded
@@ -132,7 +153,7 @@ frame:SetScript("OnEvent", function()
         ScanSavantShirt()  -- Scan for Savant shirt when opening profession window
         if Shirtswitcher.hasSavant then
             EquipShirt(SAVANT_ID)
-        else
+        elseif Shirtswitcher.chatMessagesEnabled then
             DEFAULT_CHAT_FRAME:AddMessage("Shirtswitcher: Cannot equip 'Savant' shirt - not found in bags or equipped!", 1, 0, 0)
         end
     elseif event == "SPELLCAST_START" then
@@ -140,7 +161,7 @@ frame:SetScript("OnEvent", function()
             ScanSavantShirt()  -- Scan for Savant shirt when starting a gathering skill
             if Shirtswitcher.hasSavant then
                 EquipShirt(SAVANT_ID)
-            else
+            elseif Shirtswitcher.chatMessagesEnabled then
                 DEFAULT_CHAT_FRAME:AddMessage("Shirtswitcher: Cannot equip 'Savant' shirt - not found in bags or equipped!", 1, 0, 0)
             end
         end
@@ -163,6 +184,10 @@ frame:SetScript("OnEvent", function()
     elseif event == "PLAYER_LOGOUT" then
         if not ShirtswitcherDB then ShirtswitcherDB = {} end
         ShirtswitcherDB.currentMode = Shirtswitcher.currentMode
+        ShirtswitcherDB.chatMessagesEnabled = Shirtswitcher.chatMessagesEnabled
+        -- Save minimap button position
+        local point, _, _, x, y = Shirtswitcher.minimapButton:GetPoint()
+        ShirtswitcherDB.minimapPos = {point, x, y}
     end
 end)
 
@@ -187,7 +212,14 @@ function Shirtswitcher:InitMinimapButton()
     overlay:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
     overlay:SetPoint("TOPLEFT", 0, 0)
     
-    button:SetScript("OnClick", ToggleShirt)
+    button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    button:SetScript("OnClick", function()
+        if arg1 == "LeftButton" then
+            ToggleShirt()
+        elseif arg1 == "RightButton" then
+            ToggleChatMessages()
+        end
+    end)
     
     -- Tooltip functionality
     button:SetScript("OnEnter", function()
@@ -195,11 +227,12 @@ function Shirtswitcher:InitMinimapButton()
         GameTooltip:SetOwner(this, "ANCHOR_LEFT")
         if Shirtswitcher.currentMode == "xp" then
             GameTooltip:SetText("XP Mode (New Beginnings)")
-            GameTooltip:AddLine("Click to switch to Reputation Mode (Silvertongue)", 1, 1, 1)
+            GameTooltip:AddLine("Left-click to switch to Reputation Mode (Silvertongue)", 1, 1, 1)
         else
             GameTooltip:SetText("Reputation Mode (Silvertongue)")
-            GameTooltip:AddLine("Click to switch to XP Mode (New Beginnings)", 1, 1, 1)
+            GameTooltip:AddLine("Left-click to switch to XP Mode (New Beginnings)", 1, 1, 1)
         end
+        GameTooltip:AddLine("Right-click to toggle chat messages " .. (Shirtswitcher.chatMessagesEnabled and "off" or "on"), 1, 1, 1)
         if not Shirtswitcher.hasNewBeginnings then
             GameTooltip:AddLine("Warning: 'New Beginnings' shirt not found!", 1, 0, 0)
         end
@@ -215,12 +248,11 @@ function Shirtswitcher:InitMinimapButton()
         GameTooltip:Hide()
     end)
     
-    -- Minimap button positioning
-    local function UpdatePosition()
-        local angle = ShirtswitcherDB.minimapPos or random(0, 360)
-        local x = cos(angle)
-        local y = sin(angle)
-        button:SetPoint("CENTER", Minimap, "CENTER", x * 80, y * 80)
+    -- Restore minimap button position
+    if ShirtswitcherDB and ShirtswitcherDB.minimapPos then
+        button:SetPoint(ShirtswitcherDB.minimapPos[1], Minimap, ShirtswitcherDB.minimapPos[1], ShirtswitcherDB.minimapPos[2], ShirtswitcherDB.minimapPos[3])
+    else
+        button:SetPoint("TOPLEFT", Minimap, "TOPLEFT", 0, 0)
     end
     
     -- Make the button draggable
@@ -233,18 +265,11 @@ function Shirtswitcher:InitMinimapButton()
     end)
     button:SetScript("OnDragStop", function()
         this:StopMovingOrSizing()
-        local x, y = this:GetCenter()
-        local cx, cy = Minimap:GetCenter()
-        ShirtswitcherDB.minimapPos = deg(atan2(y - cy, x - cx))
-        UpdatePosition()
+        -- Save the new position
+        local point, _, _, x, y = this:GetPoint()
+        ShirtswitcherDB.minimapPos = {point, x, y}
     end)
     
-    if not ShirtswitcherDB then ShirtswitcherDB = {} end
-    if not ShirtswitcherDB.minimapPos then
-        ShirtswitcherDB.minimapPos = random(0, 360)
-    end
-    
-    UpdatePosition()
     Shirtswitcher.minimapButton = button
     Shirtswitcher:UpdateMinimapButton()  -- Ensure the icon is set immediately
     button:Show()
@@ -266,4 +291,6 @@ SLASH_SWITCHSHIRT1 = "/switchshirt"
 SLASH_SWITCHSHIRT2 = "/ss"
 SlashCmdList["SWITCHSHIRT"] = ToggleShirt
 
-DEFAULT_CHAT_FRAME:AddMessage("Shirtswitcher addon loaded. Use /switchshirt, /ss, or click the minimap icon to toggle between XP (New Beginnings) and Reputation (Silvertongue) modes.")
+if Shirtswitcher.chatMessagesEnabled then
+    DEFAULT_CHAT_FRAME:AddMessage("Shirtswitcher addon loaded. Use /switchshirt, /ss, or click the minimap icon to toggle between XP (New Beginnings) and Reputation (Silvertongue) modes.")
+end
