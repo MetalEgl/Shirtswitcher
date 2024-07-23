@@ -14,6 +14,14 @@ You automatically switch to the "New Beginnings" (which adds 100% xp)  shirt whe
 
 You automatically switch to the "Savant" (which gives +4 skillups for professions) shirt when mining, skinning, or performing herbalism.  Also you switch when you open a profession window and begin crafting.
 
+--7/23/2024
+
+--fix minimap button position saving, allow minimap button to be placed anywhere
+
+--fix initial loading of the addon not detecting shirts (added delay for scan)
+
+--added gathering skill detection @ 300 to prevent excessive shirt switching
+
 --7/22/2024
 
 --always show equipped shirt in minimap icon so you can always visually see which shirt is equipped as the addon cycles the shirts for you
