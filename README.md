@@ -5,7 +5,7 @@ Addon created specfifically for the WoW Server Nyctermoon    https://nyctermoonw
 
 Setup:
 
-Have the "Savant" and "New Beginnings" or "Silvertongue" shirt.  All 3 shirts provide maxmimum functionalility but only two are required. 
+Have the two of the following shirts in your inventory "Savant"  "New Beginnings" and/or "Silvertongue" shirt.  All 3 shirts provide maxmimum functionalility but only two are required. 
 
 
 This mod is created to facilitate the automatic switching of shirts in Nyctermoon.  The reason this was created is because oftentimes you have these shirts as a low level character and need to constsantly switch between them while out questing and gathering.  Therefore this addon was created to automate this process.
