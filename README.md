@@ -22,8 +22,7 @@ You automatically switch to the "Savant" (which gives +4 skillups for profession
 
 --updated minimap tooltips
 
---added disabling is more than two shirts not found
-
+--added disabling if aat least two shirts not found
 
 
 --7/20/2024
