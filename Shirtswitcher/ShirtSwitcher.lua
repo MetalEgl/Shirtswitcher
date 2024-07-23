@@ -1,7 +1,10 @@
 -- Addon initialization
+ShirtswitcherDB = ShirtswitcherDB or {}
 Shirtswitcher = {}
+
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("PLAYER_LOGIN")
+frame:RegisterEvent("PLAYER_ENTERING_WORLD")
 frame:RegisterEvent("UNIT_INVENTORY_CHANGED")
 frame:RegisterEvent("CRAFT_SHOW")
 frame:RegisterEvent("TRADE_SKILL_SHOW")
@@ -21,20 +24,18 @@ Shirtswitcher.tradeskillWindowOpen = false  -- Track if a tradeskill window is o
 Shirtswitcher.addonEnabled = true  -- Track if the addon is enabled
 Shirtswitcher.availableShirts = {}  -- Track which shirts are available
 local gatheringSkills = {
-    ["Skinning"] = true,
-    ["Mining"] = true,
-    ["Herb Gathering"] = true
+    ["Skinning"] = {maxSkill = 300},
+    ["Mining"] = {maxSkill = 300},
+    ["Herbalism"] = {maxSkill = 300, spellName = "Herb Gathering"}
 }
 
 -- Function to check if player has a specific shirt (in bags or equipped)
 local function HasShirt(itemID)
-    -- Check equipped shirt
-    local equippedLink = GetInventoryItemLink("player", 4) -- 4 is the slot ID for shirts
+    local equippedLink = GetInventoryItemLink("player", 4)
     if equippedLink and string.find(equippedLink, "item:"..itemID) then
         return true
     end
     
-    -- Check bags
     for bag = 0, 4 do
         for slot = 1, GetContainerNumSlots(bag) do
             local link = GetContainerItemLink(bag, slot)
@@ -48,12 +49,42 @@ end
 
 -- Function to get the currently equipped shirt ID
 local function GetEquippedShirtID()
-    local link = GetInventoryItemLink("player", 4)  -- 4 is the slot ID for shirts
+    local link = GetInventoryItemLink("player", 4)
     if link then
         local _, _, itemID = string.find(link, "item:(%d+):")
         return tonumber(itemID)
     end
     return nil
+end
+
+-- Function to check profession skill level
+local function CheckProfessionSkill(specificSkill)
+    local numSkills = GetNumSkillLines()
+    for i = 1, numSkills do
+        local skillName, _, _, skillRank, _, _, skillMaxRank = GetSkillLineInfo(i)
+        if gatheringSkills[skillName] then
+            gatheringSkills[skillName].currentRank = skillRank
+            gatheringSkills[skillName].currentMaxRank = skillMaxRank
+            if specificSkill then
+                if skillName == specificSkill or (gatheringSkills[skillName].spellName and gatheringSkills[skillName].spellName == specificSkill) then
+                    return skillRank, skillMaxRank, gatheringSkills[skillName].maxSkill
+                end
+            end
+        end
+    end
+    if specificSkill then
+        return 0, 0, 0
+    end
+end
+
+-- Function to check if any gathering skill is maxed
+local function AnyGatheringSkillMaxed()
+    for skillName, skillInfo in pairs(gatheringSkills) do
+        if skillInfo.currentRank and skillInfo.currentRank >= skillInfo.maxSkill then
+            return true
+        end
+    end
+    return false
 end
 
 -- Function to rescan for all shirts
@@ -76,7 +107,6 @@ local function RescanShirts()
         end
     else
         Shirtswitcher.addonEnabled = true
-        -- Ensure currentMode is set to a mode with an available shirt
         if not Shirtswitcher.availableShirts[NEW_BEGINNINGS_ID] and Shirtswitcher.currentMode == "xp" then
             Shirtswitcher.currentMode = "reputation"
         elseif not Shirtswitcher.availableShirts[SILVERTONGUE_ID] and Shirtswitcher.currentMode == "reputation" then
@@ -94,20 +124,18 @@ end
 local function EquipShirt(itemID)
     if not Shirtswitcher.addonEnabled then return false end
     
-    -- Check if already equipped
     local equippedLink = GetInventoryItemLink("player", 4)
     if equippedLink and string.find(equippedLink, "item:"..itemID) then
         return true
     end
     
-    -- Check bags and equip if found
     for bag = 0, 4 do
         for slot = 1, GetContainerNumSlots(bag) do
             local link = GetContainerItemLink(bag, slot)
             if link and string.find(link, "item:"..itemID) then
                 PickupContainerItem(bag, slot)
-                PickupInventoryItem(4)  -- 4 is the slot ID for shirts
-                Shirtswitcher:UpdateMinimapButton()  -- Update minimap button after equipping
+                PickupInventoryItem(4)
+                Shirtswitcher:UpdateMinimapButton()
                 return true
             end
         end
@@ -128,7 +156,6 @@ end
 
 -- Function to toggle mode
 function Shirtswitcher:ToggleMode()
-    -- Rescan shirts before attempting to switch modes
     RescanShirts()
 
     if not self.addonEnabled then
@@ -156,77 +183,12 @@ function Shirtswitcher:ToggleMode()
     self:UpdateMinimapButton()
 end
 
--- Event handler
-frame:SetScript("OnEvent", function()
-    if event == "PLAYER_LOGIN" then
-        -- Load saved preferences
-        if ShirtswitcherDB then
-            Shirtswitcher.currentMode = ShirtswitcherDB.currentMode or Shirtswitcher.currentMode
-            Shirtswitcher.chatMessagesEnabled = ShirtswitcherDB.chatMessagesEnabled
-            if Shirtswitcher.chatMessagesEnabled == nil then Shirtswitcher.chatMessagesEnabled = true end
-        end
-        -- Initial scan for shirts
-        RescanShirts()
-        -- Initialize minimap button after variables are loaded
-        Shirtswitcher:InitMinimapButton()
-        -- Update the minimap button to reflect the current state
-        Shirtswitcher:UpdateMinimapButton()
-        
-        if Shirtswitcher.chatMessagesEnabled then
-            DEFAULT_CHAT_FRAME:AddMessage("Shirtswitcher addon loaded. Left-click the minimap button to toggle XP/Reputation mode, right-click to toggle chat messages.")
-        end
-    elseif event == "UNIT_INVENTORY_CHANGED" then
-        if arg1 == "player" then
-            RescanShirts()
-        end
-    elseif event == "CRAFT_SHOW" or event == "TRADE_SKILL_SHOW" then
-        Shirtswitcher.tradeskillWindowOpen = true
-        if Shirtswitcher.addonEnabled and Shirtswitcher.availableShirts[SAVANT_ID] then
-            EquipShirt(SAVANT_ID)
-        end
-    elseif event == "CRAFT_CLOSE" or event == "TRADE_SKILL_CLOSE" then
-        Shirtswitcher.tradeskillWindowOpen = false
-        if Shirtswitcher.addonEnabled then
-            if Shirtswitcher.currentMode == "xp" and Shirtswitcher.availableShirts[NEW_BEGINNINGS_ID] then
-                EquipShirt(NEW_BEGINNINGS_ID)
-            elseif Shirtswitcher.availableShirts[SILVERTONGUE_ID] then
-                EquipShirt(SILVERTONGUE_ID)
-            end
-        end
-    elseif event == "SPELLCAST_START" then
-        if Shirtswitcher.addonEnabled and (Shirtswitcher.tradeskillWindowOpen or gatheringSkills[arg1]) then
-            if Shirtswitcher.availableShirts[SAVANT_ID] then
-                EquipShirt(SAVANT_ID)
-            elseif Shirtswitcher.chatMessagesEnabled then
-                DEFAULT_CHAT_FRAME:AddMessage("Shirtswitcher: Cannot equip 'Savant' shirt - not found in bags or equipped!", 1, 0, 0)
-            end
-        end
-    elseif event == "PLAYER_TARGET_CHANGED" then
-        if Shirtswitcher.addonEnabled and UnitExists("target") and not UnitIsDead("target") then
-            if UnitCanAttack("player", "target") or not UnitIsPlayer("target") then
-                if Shirtswitcher.currentMode == "xp" and Shirtswitcher.availableShirts[NEW_BEGINNINGS_ID] then
-                    EquipShirt(NEW_BEGINNINGS_ID)
-                elseif Shirtswitcher.availableShirts[SILVERTONGUE_ID] then
-                    EquipShirt(SILVERTONGUE_ID)
-                end
-            end
-        end
-    elseif event == "PLAYER_LOGOUT" then
-        if not ShirtswitcherDB then ShirtswitcherDB = {} end
-        ShirtswitcherDB.currentMode = Shirtswitcher.currentMode
-        ShirtswitcherDB.chatMessagesEnabled = Shirtswitcher.chatMessagesEnabled
-        -- Save minimap button position
-        local point, _, _, x, y = Shirtswitcher.minimapButton:GetPoint()
-        ShirtswitcherDB.minimapPos = {point, x, y}
-    end
-end)
-
 -- Minimap button functionality
 function Shirtswitcher:InitMinimapButton()
     local button = CreateFrame("Button", "ShirtswitcherMinimapButton", Minimap)
     button:SetWidth(32)
     button:SetHeight(32)
-    button:SetFrameStrata("LOW")
+    button:SetFrameStrata("MEDIUM")
     button:SetToplevel(true)
     button:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
     
@@ -244,7 +206,7 @@ function Shirtswitcher:InitMinimapButton()
     
     local errorText = button:CreateFontString(nil, "OVERLAY")
     errorText:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
-    errorText:SetTextColor(1, 0, 0)  -- Red color
+    errorText:SetTextColor(1, 0, 0)
     errorText:SetPoint("BOTTOM", button, "BOTTOM", 0, -15)
     errorText:SetText("No shirts")
     errorText:Hide()
@@ -259,8 +221,7 @@ function Shirtswitcher:InitMinimapButton()
         end
     end)
 
-     -- Tooltip functionality
-     button:SetScript("OnEnter", function()
+    button:SetScript("OnEnter", function()
         GameTooltip:SetOwner(this, "ANCHOR_LEFT")
         Shirtswitcher:UpdateTooltip()
     end)
@@ -268,14 +229,20 @@ function Shirtswitcher:InitMinimapButton()
         GameTooltip:Hide()
     end)
     
-    -- Restore minimap button position
-    if ShirtswitcherDB and ShirtswitcherDB.minimapPos then
-        button:SetPoint(ShirtswitcherDB.minimapPos[1], Minimap, ShirtswitcherDB.minimapPos[1], ShirtswitcherDB.minimapPos[2], ShirtswitcherDB.minimapPos[3])
-    else
-        button:SetPoint("TOPLEFT", Minimap, "TOPLEFT", 0, 0)
+    function UpdateMinimapPosition()
+        if ShirtswitcherDB.minimapPos then
+            local x = ShirtswitcherDB.minimapPos.x
+            local y = ShirtswitcherDB.minimapPos.y
+            button:ClearAllPoints()
+            button:SetPoint("CENTER", Minimap, "CENTER", x, y)
+        else
+            -- Default position if no saved position exists
+            button:SetPoint("TOPLEFT", Minimap, "TOPLEFT", -5, 5)
+        end
     end
+
+    UpdateMinimapPosition()
     
-    -- Make the button draggable
     button:SetMovable(true)
     button:EnableMouse(true)
     button:SetClampedToScreen(true)
@@ -285,13 +252,19 @@ function Shirtswitcher:InitMinimapButton()
     end)
     button:SetScript("OnDragStop", function()
         this:StopMovingOrSizing()
-        -- Save the new position
-        local point, _, _, x, y = this:GetPoint()
-        ShirtswitcherDB.minimapPos = {point, x, y}
+        local x, y = this:GetCenter()
+        local minimapX, minimapY = Minimap:GetCenter()
+        local relativeX = x - minimapX
+        local relativeY = y - minimapY
+        ShirtswitcherDB.minimapPos = {x = relativeX, y = relativeY}
     end)
     
+    if GetMinimapShape then
+        hooksecurefunc("GetMinimapShape", UpdateMinimapPosition)
+    end
+    
     Shirtswitcher.minimapButton = button
-    self:UpdateMinimapButton()  -- Ensure the icon is set immediately
+    self:UpdateMinimapButton()
     button:Show()
 end
 
@@ -316,7 +289,6 @@ function Shirtswitcher:UpdateMinimapButton()
     end
     self.minimapButton.icon:SetTexCoord(0.05, 0.95, 0.05, 0.95)
 
-    -- Update tooltip if it's currently shown
     if GameTooltip:IsOwned(self.minimapButton) then
         self:UpdateTooltip()
     end
@@ -339,14 +311,12 @@ function Shirtswitcher:UpdateTooltip()
             GameTooltip:SetText("No special shirt equipped")
         end
         
-        -- Add mode information with color coding
         if self.currentMode == "xp" then
-            GameTooltip:AddLine("Current Mode: XP", 1, 1, 0)  -- Yellow color
+            GameTooltip:AddLine("Current Mode: XP", 1, 1, 0)
         else
-            GameTooltip:AddLine("Current Mode: Reputation", 0, 1, 0)  -- Green color
+            GameTooltip:AddLine("Current Mode: Reputation", 0, 1, 0)
         end
         
-        -- Check if player is stuck in current mode
         local stuckInMode = false
         if self.currentMode == "xp" and not self.availableShirts[SILVERTONGUE_ID] then
             stuckInMode = true
@@ -362,15 +332,100 @@ function Shirtswitcher:UpdateTooltip()
         
         GameTooltip:AddLine("Right-click to toggle chat messages " .. (self.chatMessagesEnabled and "off" or "on"), 1, 1, 1)
         
-        -- Add information about Savant shirt
         if self.availableShirts[SAVANT_ID] then
-            GameTooltip:AddLine("Savant shirt available for professions", 0, 1, 1)
+            if AnyGatheringSkillMaxed() then
+                GameTooltip:AddLine("Savant shirt available (some skills maxed)", 0, 1, 1)
+            else
+                GameTooltip:AddLine("Savant shirt available for gathering", 0, 1, 1)
+            end
+            for skillName, skillInfo in pairs(gatheringSkills) do
+                if skillInfo.currentRank then
+                    GameTooltip:AddLine(string.format("%s: %d/%d", skillName, skillInfo.currentRank, skillInfo.maxSkill), 1, 1, 1)
+                end
+            end
         else
             GameTooltip:AddLine("Savant shirt not available", 1, 0, 0)
         end
     end
     GameTooltip:Show()
 end
+
+-- Event handler
+frame:SetScript("OnEvent", function()
+    if event == "PLAYER_LOGIN" then
+        -- Initialize default values if they don't exist
+        ShirtswitcherDB.currentMode = ShirtswitcherDB.currentMode or "xp"
+        ShirtswitcherDB.chatMessagesEnabled = ShirtswitcherDB.chatMessagesEnabled
+        if ShirtswitcherDB.chatMessagesEnabled == nil then ShirtswitcherDB.chatMessagesEnabled = true end
+        ShirtswitcherDB.minimapPos = ShirtswitcherDB.minimapPos or {x = -15, y = -15}
+
+        -- Load preferences into the addon
+        Shirtswitcher.currentMode = ShirtswitcherDB.currentMode
+        Shirtswitcher.chatMessagesEnabled = ShirtswitcherDB.chatMessagesEnabled
+
+        -- Initialize minimap button after variables are loaded
+        Shirtswitcher:InitMinimapButton()
+        
+        if Shirtswitcher.chatMessagesEnabled then
+            DEFAULT_CHAT_FRAME:AddMessage("Shirtswitcher addon loaded. Left-click the minimap button to toggle XP/Reputation mode, right-click to toggle chat messages.")
+        end
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        -- Delay the initial scan to ensure all data is loaded
+        frame:SetScript("OnUpdate", function()
+            this.timer = (this.timer or 0) + arg1
+            if this.timer >= 1 then
+                this:SetScript("OnUpdate", nil)
+                RescanShirts()
+                Shirtswitcher:UpdateMinimapButton()
+            end
+        end)
+    elseif event == "UNIT_INVENTORY_CHANGED" then
+        if arg1 == "player" then
+            RescanShirts()
+        end
+    elseif event == "CRAFT_SHOW" or event == "TRADE_SKILL_SHOW" then
+        Shirtswitcher.tradeskillWindowOpen = true
+        CheckProfessionSkill()  -- Update all gathering skills
+    elseif event == "CRAFT_CLOSE" or event == "TRADE_SKILL_CLOSE" then
+        Shirtswitcher.tradeskillWindowOpen = false
+        if Shirtswitcher.addonEnabled then
+            if Shirtswitcher.currentMode == "xp" and Shirtswitcher.availableShirts[NEW_BEGINNINGS_ID] then
+                EquipShirt(NEW_BEGINNINGS_ID)
+            elseif Shirtswitcher.availableShirts[SILVERTONGUE_ID] then
+                EquipShirt(SILVERTONGUE_ID)
+            end
+        end
+    elseif event == "SPELLCAST_START" then
+        if Shirtswitcher.addonEnabled then
+            local skillName = arg1
+            for profession, info in pairs(gatheringSkills) do
+                if skillName == profession or (info.spellName and skillName == info.spellName) then
+                    local skillRank, skillMaxRank, absoluteMaxSkill = CheckProfessionSkill(profession)
+                    if Shirtswitcher.availableShirts[SAVANT_ID] and skillRank < absoluteMaxSkill then
+                        EquipShirt(SAVANT_ID)
+                    elseif Shirtswitcher.chatMessagesEnabled and not Shirtswitcher.availableShirts[SAVANT_ID] then
+                        DEFAULT_CHAT_FRAME:AddMessage("Shirtswitcher: Cannot equip 'Savant' shirt - not found in bags or equipped!", 1, 0, 0)
+                    end
+                    break
+                end
+            end
+        end
+    elseif event == "PLAYER_TARGET_CHANGED" then
+        if Shirtswitcher.addonEnabled and UnitExists("target") and not UnitIsDead("target") then
+            if UnitCanAttack("player", "target") or not UnitIsPlayer("target") then
+                if Shirtswitcher.currentMode == "xp" and Shirtswitcher.availableShirts[NEW_BEGINNINGS_ID] then
+                    EquipShirt(NEW_BEGINNINGS_ID)
+                elseif Shirtswitcher.availableShirts[SILVERTONGUE_ID] then
+                    EquipShirt(SILVERTONGUE_ID)
+                end
+            end
+        end
+    elseif event == "PLAYER_LOGOUT" then
+        ShirtswitcherDB.currentMode = Shirtswitcher.currentMode
+        ShirtswitcherDB.chatMessagesEnabled = Shirtswitcher.chatMessagesEnabled
+        -- Minimap position is now saved immediately after dragging, so we don't need to save it here
+    end
+end)
 
 -- Slash commands
 SLASH_SHIRTSWITCHER1 = "/shirtswitcher"
