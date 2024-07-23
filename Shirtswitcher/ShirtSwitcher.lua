@@ -1,7 +1,7 @@
 -- Addon initialization
 Shirtswitcher = {}
 local frame = CreateFrame("Frame")
-frame:RegisterEvent("VARIABLES_LOADED")
+frame:RegisterEvent("PLAYER_LOGIN")
 frame:RegisterEvent("UNIT_INVENTORY_CHANGED")
 frame:RegisterEvent("CRAFT_SHOW")
 frame:RegisterEvent("TRADE_SKILL_SHOW")
@@ -84,7 +84,9 @@ local function RescanShirts()
         end
     end
     
-    Shirtswitcher:UpdateMinimapButton()
+    if Shirtswitcher.minimapButton then
+        Shirtswitcher:UpdateMinimapButton()
+    end
     return Shirtswitcher.addonEnabled
 end
 
@@ -156,7 +158,7 @@ end
 
 -- Event handler
 frame:SetScript("OnEvent", function()
-    if event == "VARIABLES_LOADED" then
+    if event == "PLAYER_LOGIN" then
         -- Load saved preferences
         if ShirtswitcherDB then
             Shirtswitcher.currentMode = ShirtswitcherDB.currentMode or Shirtswitcher.currentMode
@@ -167,6 +169,12 @@ frame:SetScript("OnEvent", function()
         RescanShirts()
         -- Initialize minimap button after variables are loaded
         Shirtswitcher:InitMinimapButton()
+        -- Update the minimap button to reflect the current state
+        Shirtswitcher:UpdateMinimapButton()
+        
+        if Shirtswitcher.chatMessagesEnabled then
+            DEFAULT_CHAT_FRAME:AddMessage("Shirtswitcher addon loaded. Left-click the minimap button to toggle XP/Reputation mode, right-click to toggle chat messages.")
+        end
     elseif event == "UNIT_INVENTORY_CHANGED" then
         if arg1 == "player" then
             RescanShirts()
@@ -250,9 +258,9 @@ function Shirtswitcher:InitMinimapButton()
             ToggleChatMessages()
         end
     end)
-    
-    -- Tooltip functionality
-    button:SetScript("OnEnter", function()
+
+     -- Tooltip functionality
+     button:SetScript("OnEnter", function()
         GameTooltip:SetOwner(this, "ANCHOR_LEFT")
         Shirtswitcher:UpdateTooltip()
     end)
